@@ -38,24 +38,36 @@ export default function Home() {
           const ctx = canvas.getContext('2d');
           ctx?.drawImage(img, 0, 0, width, height);
 
-          // Convert to WebP with 0.8 quality
-          const webpUrl = canvas.toDataURL('image/webp', 0.8);
-          
-          // Get the size of the compressed image
-          const response = await fetch(webpUrl);
-          const blob = await response.blob();
+          // Start with a default quality
+          let quality = 0.8;
+          let webpUrl = canvas.toDataURL('image/webp', quality);
+          let response = await fetch(webpUrl);
+          let blob = await response.blob();
 
-          resolve({
-            name: file.name
-              .replace(/\.[^/.]+$/, '') // Remove file extension
-              .toLowerCase() // Convert to lowercase
-              .replace(/[^a-z0-9]+/g, '-') // Replace non-alphanumeric chars with hyphens
-              .replace(/^-+|-+$/g, '') // Remove leading/trailing hyphens
-              + '-optimized.webp',
-            url: webpUrl,
-            size: blob.size,
-            originalSize: file.size
-          });
+          // Dynamically adjust quality if compressed size is larger
+          while (blob.size > file.size && quality > 0.1) {
+            quality -= 0.1;
+            webpUrl = canvas.toDataURL('image/webp', quality);
+            response = await fetch(webpUrl);
+            blob = await response.blob();
+          }
+
+          // Use original image if compression is not effective
+          if (blob.size >= file.size) {
+            resolve({
+              name: file.name,
+              url: e.target?.result as string,
+              size: file.size,
+              originalSize: file.size,
+            });
+          } else {
+            resolve({
+              name: file.name.replace(/\.[^/.]+$/, '') + '-optimized.webp',
+              url: webpUrl,
+              size: blob.size,
+              originalSize: file.size,
+            });
+          }
         };
         img.src = e.target?.result as string;
       };
@@ -81,7 +93,7 @@ export default function Home() {
 
   const downloadAll = async () => {
     const zip = new JSZip();
-    
+
     // Add all images to the zip
     processedImages.forEach(image => {
       // Convert base64 to blob
@@ -124,8 +136,8 @@ export default function Home() {
           <p className="mt-2 text-gray-600">Optimize your images with WebP compression</p>
         </div>
 
-        <div 
-          {...getRootProps()} 
+        <div
+          {...getRootProps()}
           className={`mt-4 p-8 border-2 border-dashed rounded-lg text-center cursor-pointer transition-colors
             ${isDragActive ? 'border-blue-400 bg-blue-50' : 'border-gray-300 hover:border-gray-400'}`}
         >
@@ -171,8 +183,8 @@ export default function Home() {
                   <li key={index} className="p-4 hover:bg-gray-50">
                     <div className="flex items-center justify-between">
                       <div className="flex items-center">
-                        <img 
-                          src={image.url} 
+                        <img
+                          src={image.url}
                           alt={image.name}
                           className="h-16 w-16 object-cover rounded"
                         />

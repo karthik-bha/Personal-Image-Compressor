@@ -23,32 +23,49 @@ function App() {
           const canvas = document.createElement('canvas');
           let width = img.width;
           let height = img.height;
-
+  
           // Resize if width is greater than 1600px
           if (width > 1600) {
             const ratio = 1600 / width;
             width = 1600;
             height = height * ratio;
           }
-
+  
           canvas.width = width;
           canvas.height = height;
           const ctx = canvas.getContext('2d');
           ctx?.drawImage(img, 0, 0, width, height);
-
-          // Convert to WebP with 0.8 quality
-          const webpUrl = canvas.toDataURL('image/webp', 0.8);
-          
-          // Get the size of the compressed image
-          const response = await fetch(webpUrl);
-          const blob = await response.blob();
-
-          resolve({
-            name: file.name.replace(/\.[^/.]+$/, '') + '-optimized.webp',
-            url: webpUrl,
-            size: blob.size,
-            originalSize: file.size
-          });
+  
+          // Start with a default quality
+          let quality = 0.8;
+          let webpUrl = canvas.toDataURL('image/webp', quality);
+          let response = await fetch(webpUrl);
+          let blob = await response.blob();
+  
+          // Dynamically adjust quality if compressed size is larger
+          while (blob.size > file.size && quality > 0.1) {
+            quality -= 0.1;
+            webpUrl = canvas.toDataURL('image/webp', quality);
+            response = await fetch(webpUrl);
+            blob = await response.blob();
+          }
+  
+          // Use original image if compression is not effective
+          if (blob.size >= file.size) {
+            resolve({
+              name: file.name,
+              url: e.target?.result as string,
+              size: file.size,
+              originalSize: file.size,
+            });
+          } else {
+            resolve({
+              name: file.name.replace(/\.[^/.]+$/, '') + '-optimized.webp',
+              url: webpUrl,
+              size: blob.size,
+              originalSize: file.size,
+            });
+          }
         };
         img.src = e.target?.result as string;
       };
